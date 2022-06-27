@@ -5,70 +5,40 @@ import { useLoaderData, useNavigate } from "@remix-run/react";
 
 import { User, Star, Plus, Menu2 } from "tabler-icons-react";
 
+import { getMovies, getMovieDetails } from "~/utils/api";
 import { randomDate } from "~/utils/randomDate";
 
-import type { MovieProps } from "~/components/Movie";
+import { useSliderOver } from "~/hooks/useSlideOver";
 
 import SlideOver from "~/components/SlideOver";
 import Notification from "~/components/Notification";
+import { useMovies } from "~/hooks/useMovies";
 
 export const loader: LoaderFunction = async () => {
   const randomYear = randomDate().getFullYear();
   const randomPage = Math.floor(Math.random() * 10) + 1;
   const randomMovie = Math.floor(Math.random() * 20);
 
-  const res = await fetch(
-    `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=true&include_video=false&page=${randomPage}&primary_release_year=${randomYear}`
-  );
-  const data = await res.json();
+  const fetchedMovies = await getMovies(randomYear, randomPage);
 
-  const movie = data.results[randomMovie];
+  const movie = fetchedMovies.results[randomMovie];
 
-  const res2 = await fetch(
-    `https://api.themoviedb.org/3/movie/${movie.id}?api_key=${process.env.API_KEY}&language=en-US`
-  );
-  const movieDetails = await res2.json();
+  const movieDetails = await getMovieDetails(movie.id);
 
   return json(movieDetails);
 };
 
 export default function Index() {
-  const [showNotification, setShowNotification] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [movies, setMovies] = useState<MovieProps[]>([]);
   const movie = useLoaderData();
+  const [showNotification, setShowNotification] = useState(false);
   const navigate = useNavigate();
 
-  const openSlideOver = () => setOpen(true);
-  const closeSlideOver = () => setOpen(false);
-
-  const removeMovie = (id: string) => {
-    const newMovies = movies.filter(
-      (bookmark: MovieProps) => bookmark.id !== id
-    );
-    setMovies(newMovies);
-  };
-
-  const addMovieToList = () => {
-    const newMovie = {
-      id: movie.id,
-      title: movie.title,
-      posterUrl: `https://image.tmdb.org/t/p/w185${movie.poster_path}`,
-      imdbUrl: `https://www.imdb.com/title/${movie.imdb_id}`,
-    } as MovieProps;
-
-    setMovies([...movies, newMovie]);
-
-    setShowNotification(true);
-
-    setTimeout(() => {
-      setShowNotification(false);
-    }, 2000);
-  };
+  const { open, openSlideOver, closeSlideOver } = useSliderOver();
+  const { movies, setMovies, addMovieToList, removeMovie } = useMovies();
 
   useEffect(() => {
     setMovies(JSON.parse(localStorage.getItem("movies") || "[]"));
-  }, []);
+  }, [setMovies]);
 
   useEffect(() => {
     localStorage.setItem("movies", JSON.stringify(movies));
@@ -91,11 +61,11 @@ export default function Index() {
         removeMovie={removeMovie}
       />
       <Notification show={showNotification} setShow={setShowNotification} />
-      <div className="relative w-96">
+      <div className="relative w-96 md:w-[500px] lg:w-96">
         <div className="flex items-center justify-center">
           <button
             onClick={() => navigate(".")}
-            className="w-3/4 mx-auto sm:w-full px-4 py-2 mb-6 mt-16 rounded-lg drop-shadow-2xl bg-white/20"
+            className="w-3/4 mx-auto sm:w-full md:text-xl lg:text-base px-4 py-2 mb-6 mt-16 rounded-lg drop-shadow-2xl bg-white/20"
           >
             Generate Random Movie
           </button>
@@ -115,7 +85,7 @@ export default function Index() {
               />
             </a>
             <button
-              onClick={addMovieToList}
+              onClick={() => addMovieToList(movie, setShowNotification)}
               className="absolute top-10 right-0 py-1 px-2 rounded-tl-lg rounded-bl-lg bg-gradient-to-r bg-indigo-500 hover:bg-indigo-700 backdrop-opacity-60"
             >
               <Plus className="mr-1" />
